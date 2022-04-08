@@ -6,10 +6,9 @@ import (
 )
 
 type Server struct {
-	ip             string
-	port           int
-	Broadcast_chan chan string
-	OlineMap       map[string]*User
+	ip       string
+	port     int
+	OlineMap map[string]*User
 }
 
 func (t *Server) Start() {
@@ -18,8 +17,6 @@ func (t *Server) Start() {
 		fmt.Printf("listen err: %v\n", err)
 	}
 	defer listener.Close()
-	//开启广播机制
-	go t.Broadcast()
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -34,29 +31,37 @@ func (t *Server) Start() {
 //用户业务逻辑
 func (t *Server) Handler(conn net.Conn) {
 	//创建用户
-	user := NewUser(conn, t.Broadcast_chan)
-	//将用加入全局用户表中
-	t.OlineMap[user.Conn.RemoteAddr().String()] = user
+	user := NewUser(conn, t)
 	//监听user维护的chan
 	go user.listenC()
 	go user.Reader()
 }
 
-func (t *Server) Broadcast() {
-	for {
-		mes := <-t.Broadcast_chan
+func command(mes string) bool {
+	for _, i := range []string{"list"} {
+		if i == mes {
+			return true
+		}
+	}
+	return false
+}
+
+func (t *Server) Broadcast(user *User, mes string) {
+	if command(mes) {
+	} else {
 		for _, one_user := range t.OlineMap {
-			one_user.C <- mes
+			if one_user != user {
+				one_user.C <- user.Name + ": " + mes
+			}
 		}
 	}
 }
 
 func NewServer(ip string, port int) (server *Server) {
 	server = &Server{
-		ip:             ip,
-		port:           port,
-		OlineMap:       make(map[string]*User),
-		Broadcast_chan: make(chan string),
+		ip:       ip,
+		port:     port,
+		OlineMap: make(map[string]*User),
 	}
 	return
 }
