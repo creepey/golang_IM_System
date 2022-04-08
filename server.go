@@ -18,14 +18,17 @@ func (t *Server) Start() {
 		fmt.Printf("listen err: %v\n", err)
 	}
 	defer listener.Close()
+	//开启广播机制
+	go t.Broadcast()
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			fmt.Printf("conn err: %v\n", err)
 		}
-		fmt.Println("连接已建立")
+		fmt.Println(conn.RemoteAddr().String() + "连接已建立")
 		go t.Handler(conn)
 	}
+
 }
 
 //用户业务逻辑
@@ -36,17 +39,14 @@ func (t *Server) Handler(conn net.Conn) {
 	t.OlineMap[user.Conn.RemoteAddr().String()] = user
 	//监听user维护的chan
 	go user.listenC()
-
-	go t.Broadcast(user)
+	go user.Reader()
 }
 
-func (t *Server) Broadcast(user *User) {
+func (t *Server) Broadcast() {
 	for {
 		mes := <-t.Broadcast_chan
 		for _, one_user := range t.OlineMap {
-			if one_user != user {
-				one_user.C <- mes
-			}
+			one_user.C <- mes
 		}
 	}
 }
